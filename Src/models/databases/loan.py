@@ -34,3 +34,4 @@ class LoanCreate(BaseModel):
 class LoanUpdate(BaseModel):
     taken: Optional[bool] = None
     returned: Optional[bool] = None
+

@@ -7,6 +7,7 @@ from sqlmodel import select
 from pydantic import BaseModel
 from Src.database import SessionDep
 from Src.dependecies import authenticate, isAdmin, get_current_account
+from typing import Optional
 
 router = APIRouter(prefix='/loans', dependencies=[Depends(authenticate)])
 
@@ -28,8 +29,14 @@ async def get_loan(loan_id: int, session: SessionDep):
     return loan
 
 @router.post('', response_model=LoanPublic, status_code=status.HTTP_201_CREATED)
-async def create_loan(request: Request, loan: req_loan.CreateLoan, session: SessionDep):
+async def create_loan(request: Request, loan: req_loan.CreateLoan, session: SessionDep, current_account: Account = Depends(get_current_account)):
     book_db = session.get(Book, loan.book_id)
+    account_db = session.get(Account, loan.account_id)
+    use_account_id = loan.account_id != None and current_account.role == 'admin'
+    
+    if use_account_id and not account_db:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Given account is not found")
+    
     if not book_db or book_db.deleted_at:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
     
@@ -37,7 +44,7 @@ async def create_loan(request: Request, loan: req_loan.CreateLoan, session: Sess
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Book's stock isn't enough to be borrowed")
     
     loan_db = Loan.model_validate({
-        'account_id': request.scope['account_id'],
+        'account_id': loan.account_id if use_account_id else request.scope['account_id'],
         'book_id': loan.book_id,
         'loan_date': loan.loan_date,
         'return_date': loan.return_date,
