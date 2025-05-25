@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from Src.models.databases.book import Book, BookPublic, BookCreate, BookUpdate
 from sqlmodel import select
+from datetime import datetime
 from pydantic import BaseModel
 from Src.database import SessionDep
 from Src.dependecies import authenticate, isAdmin
@@ -9,13 +10,13 @@ router = APIRouter(prefix='/books', dependencies=[Depends(authenticate)])
 
 @router.get('', response_model=list[BookPublic])
 async def get_all_books(session: SessionDep):
-    books = session.exec(select(Book)).all()
+    books = session.exec(select(Book).where(Book.deleted_at == None)).all()
     return books
 
 @router.get('/{book_id}', response_model=BookPublic)
 async def get_book(book_id: int, session: SessionDep):
     book = session.get(Book, book_id)
-    if not book:
+    if not book or book.deleted_at:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
     
     return book
@@ -32,7 +33,7 @@ async def create_book(book: BookCreate, session: SessionDep):
 @router.patch('/{book_id}', response_model=BookPublic, dependencies=[Depends(isAdmin)])
 async def update_book(book_id: int, book: BookUpdate, session: SessionDep):
     book_db = session.get(Book, book_id)
-    if not book_db:
+    if not book_db or book_db.deleted_at:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
     
     book_data = book.model_dump(exclude_unset=True)
@@ -44,12 +45,16 @@ async def update_book(book_id: int, book: BookUpdate, session: SessionDep):
     return book_db
 
 @router.delete('/{book_id}', response_model=BaseModel, dependencies=[Depends(isAdmin)])
-async def delete_book(book_id: int, session: SessionDep):
+async def delete_book(request: Request, book_id: int, session: SessionDep):
     book_db = session.get(Book, book_id)
-    if not book_db:
+    if not book_db or book_db.deleted_at:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
     
-    session.delete(book_db)
+    book_db.sqlmodel_update({
+        'deleted_at': datetime.now(),
+        'deleted_by': request.scope['account_id'],
+    })
+    session.add(book_db)
     session.commit()
     
     return {}

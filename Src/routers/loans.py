@@ -13,16 +13,16 @@ router = APIRouter(prefix='/loans', dependencies=[Depends(authenticate)])
 @router.get('', response_model=list[LoanPublic])
 async def get_all_loans(session: SessionDep, current_account: Account = Depends(get_current_account)):
     if current_account.role == 'admin':
-        loans = session.exec(select(Loan)).all()
+        loans = session.exec(select(Loan).where(Loan.deleted_at == None)).all()
     else:
-        loans = session.exec(select(Loan).filter_by(account_id=current_account.account_id)).all()
+        loans = session.exec(select(Loan).where(Loan.deleted_at == None).filter_by(account_id=current_account.account_id)).all()
         
     return loans
 
 @router.get('/{loan_id}', response_model=LoanPublic)
 async def get_loan(loan_id: int, session: SessionDep):
     loan = session.get(Loan, loan_id)
-    if not loan:
+    if not loan or loan.deleted_at:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Loan not found")
     
     return loan
@@ -30,8 +30,11 @@ async def get_loan(loan_id: int, session: SessionDep):
 @router.post('', response_model=LoanPublic, status_code=status.HTTP_201_CREATED)
 async def create_loan(request: Request, loan: req_loan.CreateLoan, session: SessionDep):
     book_db = session.get(Book, loan.book_id)
-    if not book_db:
+    if not book_db or book_db.deleted_at:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
+    
+    if book_db.stock < 1:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Book's stock isn't enough to be borrowed")
     
     loan_db = Loan.model_validate({
         'account_id': request.scope['account_id'],
@@ -54,11 +57,11 @@ async def create_loan(request: Request, loan: req_loan.CreateLoan, session: Sess
 @router.patch('/{loan_id}', response_model=LoanPublic, dependencies=[Depends(isAdmin)])
 async def update_loan(loan_id: int, loan: LoanUpdate, session: SessionDep):
     loan_db = session.get(Loan, loan_id)
-    if not loan_db:
+    if not loan_db or loan_db.deleted_at:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Loan not found")
     
     book_db = session.get(Book, loan_db.book_id)
-    if not book_db:
+    if not book_db or book_db.deleted_at:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
     
     loan_data = loan.model_dump(exclude_unset=True)
@@ -72,11 +75,11 @@ async def update_loan(loan_id: int, loan: LoanUpdate, session: SessionDep):
 @router.delete('/{loan_id}', response_model=BaseModel, dependencies=[Depends(isAdmin)])
 async def delete_loan(loan_id: int, session: SessionDep):
     loan_db = session.get(Loan, loan_id)
-    if not loan_db:
+    if not loan_db or loan_db.deleted_at:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Loan not found")
     
     book_db = session.get(Book, loan_db.book_id)
-    if not book_db:
+    if not book_db or book_db.deleted_at:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
     
     book_db.sqlmodel_update({

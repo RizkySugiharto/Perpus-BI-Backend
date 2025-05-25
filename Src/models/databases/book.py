@@ -14,6 +14,8 @@ class Book(BookBase, table=True):
     
     book_id: Optional[int] = Field(default=None, primary_key=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    deleted_at: Optional[datetime] = None
+    deleted_by: Optional[int] = Field(default=None, foreign_key="accounts.account_id")
 
 class BookPublic(BookBase):
     book_id: int

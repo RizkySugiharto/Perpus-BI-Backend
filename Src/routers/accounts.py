@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from Src.models.databases.account import Account, AccountPublic, AccountCreate, AccountUpdate
 from sqlmodel import select
 from pydantic import BaseModel
@@ -10,13 +11,13 @@ router = APIRouter(prefix='/accounts', dependencies=[Depends(authenticate), Depe
 
 @router.get('', response_model=list[AccountPublic])
 async def get_all_accounts(session: SessionDep):
-    accounts = session.exec(select(Account)).all()
+    accounts = session.exec(select(Account).where(Account.deleted_at == None)).all()
     return accounts
 
 @router.get('/{account_id}', response_model=AccountPublic)
 async def get_account(account_id: int, session: SessionDep):
     account = session.get(Account, account_id)
-    if not account:
+    if not account or account.deleted_at:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     
     return account
@@ -39,7 +40,7 @@ async def create_account(account: AccountCreate, session: SessionDep):
 @router.patch('/{account_id}', response_model=AccountPublic)
 async def update_account(account_id: int, account: AccountUpdate, session: SessionDep):
     account_db = session.get(Account, account_id)
-    if not account_db:
+    if not account_db or account_db.deleted_at:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     
     account_data = account.model_dump(exclude_unset=True)
@@ -51,12 +52,16 @@ async def update_account(account_id: int, account: AccountUpdate, session: Sessi
     return account_db
 
 @router.delete('/{account_id}', response_model=BaseModel)
-async def delete_account(account_id: int, session: SessionDep):
+async def delete_account(request: Request, account_id: int, session: SessionDep):
     account_db = session.get(Account, account_id)
-    if not account_db:
+    if not account_db or account_db.deleted_at:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     
-    session.delete(account_db)
+    account_db.sqlmodel_update({
+        'deleted_at': datetime.now(),
+        'deleted_by': request.scope['account_id'],
+    })
+    session.add(account_db)
     session.commit()
     
     return {}

@@ -5,7 +5,6 @@ from typing import Literal, Optional
 
 class AccountBase(SQLModel):
     email: str = Field(nullable=False, max_length=255, index=True, unique=True)
-    password_hash: str = Field(nullable=False)
     role: Optional[Literal['anggota', 'admin']] = Field(default='anggota', nullable=False, sa_type=String(10))
     activated: bool = Field(default=False)
 
@@ -13,7 +12,10 @@ class Account(AccountBase, table=True):
     __tablename__ = 'accounts'
     
     account_id: Optional[int] = Field(default=None, primary_key=True)
+    password_hash: str = Field(nullable=False)
     created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    deleted_at: Optional[datetime] = None
+    deleted_by: Optional[int] = Field(default=None, foreign_key="accounts.account_id")
 
 class AccountPublic(AccountBase):
     account_id: int

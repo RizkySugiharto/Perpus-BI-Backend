@@ -43,10 +43,10 @@ async def login(request: Request, data: Annotated[req_auth.Login, Body(embed=Tru
     account = session.exec(select(Account).filter_by(email=data.email)).one_or_none()
     password_hash = utils.one_way_encrypt(data.password)
     
-    if not account or account.password_hash != password_hash:
+    if not account or account.deleted_at or account.password_hash != password_hash:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email or password is not valid")
     if account and not account.activated:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="You account account isn't activated yet")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Your account isn't activated yet")
 
     jwt_token = utils.encode_to_jwt({
         'account_id': account.account_id
@@ -71,11 +71,20 @@ async def logout(response: Response):
 @router.get('/me', response_model=res_auth.GetMe, dependencies=[Depends(authenticate)])
 async def get_me(request: Request, session: SessionDep):
     account = session.get(Account, request.scope['account_id'])
+    if not account or account.deleted_at:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Your account isn't found or maybe have been deleted")
+    if account and not account.activated:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Your account isn't activated yet")
+    
     return account
 
 @router.patch('/me', response_model=res_auth.UpdateMe, dependencies=[Depends(authenticate)])
 async def update_me(request: Request, data: Annotated[req_auth.UpdateMe, Body(embed=True)], session: SessionDep):
     account_db = session.get(Account, request.scope['account_id'])
+    if not account_db or account_db.deleted_at:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Your account isn't found or maybe have been deleted")
+    if account_db and not account_db.activated:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Your account isn't activated yet")
     
     account_db.sqlmodel_update({
         'email': data.email
