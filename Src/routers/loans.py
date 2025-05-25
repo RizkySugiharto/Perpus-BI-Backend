@@ -3,6 +3,7 @@ from Src.models.databases.account import Account
 from Src.models.databases.book import Book
 from Src.models.databases.loan import Loan, LoanPublic, LoanUpdate
 from Src.models.requests import loan as req_loan
+from Src.models.queries import GetAllLoans as Q_GetAllLoans
 from sqlmodel import select
 from pydantic import BaseModel
 from Src.database import SessionDep
@@ -12,8 +13,8 @@ from typing import Optional
 router = APIRouter(prefix='/loans', dependencies=[Depends(authenticate)])
 
 @router.get('', response_model=list[LoanPublic])
-async def get_all_loans(session: SessionDep, current_account: Account = Depends(get_current_account)):
-    if current_account.role == 'admin':
+async def get_all_loans(session: SessionDep, query: Q_GetAllLoans, current_account: Account = Depends(get_current_account)):
+    if current_account.role == 'admin' and query.all:
         loans = session.exec(select(Loan).where(Loan.deleted_at == None)).all()
     else:
         loans = session.exec(select(Loan).where(Loan.deleted_at == None).filter_by(account_id=current_account.account_id)).all()

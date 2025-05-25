@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from Src.models.databases.book import Book, BookPublic, BookCreate, BookUpdate
-from sqlmodel import select
+from Src.models.queries import GetAllBooks as Q_GetAllBooks
+from sqlmodel import select, col, or_
 from datetime import datetime
 from pydantic import BaseModel
 from Src.database import SessionDep
@@ -9,8 +10,17 @@ from Src.dependecies import authenticate, isAdmin
 router = APIRouter(prefix='/books', dependencies=[Depends(authenticate)])
 
 @router.get('', response_model=list[BookPublic])
-async def get_all_books(session: SessionDep):
-    books = session.exec(select(Book).where(Book.deleted_at == None)).all()
+async def get_all_books(session: SessionDep, query: Q_GetAllBooks):
+    query_books = select(Book).where(Book.deleted_at == None)
+    if query.search:
+        query_books = query_books.where(
+            or_(col(Book.title).like(f'%{query.search}%'),
+            col(Book.author).like(f'%{query.search}%'),
+            col(Book.publisher).like(f'%{query.search}%'),
+            col(Book.published_year).like(f'%{query.search}%'))
+        )
+    
+    books = session.exec(query_books).all()
     return books
 
 @router.get('/{book_id}', response_model=BookPublic)
