@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from Src.routers import auth, accounts, books, loans, members
+from Src.routers import auth, accounts, books, loans, members, statistics
 from Src.database import create_db_and_tables
 from starlette.middleware.cors import CORSMiddleware
 import uvicorn
@@ -35,6 +35,7 @@ app.include_router(accounts.router, tags=['account'])
 app.include_router(members.router, tags=['members'])
 app.include_router(books.router, tags=['book'])
 app.include_router(loans.router, tags=['loan'])
+app.include_router(statistics.router, tags=['statistics'])
 
 if __name__ == "__main__":
     uvicorn.run(

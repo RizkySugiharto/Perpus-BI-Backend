@@ -65,7 +65,12 @@ async def login(request: Request, data: Annotated[req_auth.Login, Body(embed=Tru
 
 @router.post('/logout', response_model=BaseModel)
 async def logout(response: Response):
-    response.delete_cookie(key='token')
+    response.delete_cookie(
+        key='token',
+        secure=True,
+        httponly=True,
+        samesite='none'
+    )
     return {}
 
 @router.get('/me', response_model=res_auth.GetMe, dependencies=[Depends(authenticate)])

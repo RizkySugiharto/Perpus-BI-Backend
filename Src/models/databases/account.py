@@ -5,7 +5,7 @@ from typing import Literal, Optional
 
 class AccountBase(SQLModel):
     email: str = Field(nullable=False, max_length=255, index=True, unique=True)
-    role: Optional[Literal['anggota', 'admin']] = Field(default='anggota', nullable=False, sa_type=String(10))
+    role: Optional[Literal['anggota', 'admin', 'staff']] = Field(default='anggota', nullable=False, sa_type=String(10))
     activated: bool = Field(default=False)
 
 class Account(AccountBase, table=True):
@@ -24,10 +24,11 @@ class AccountPublic(AccountBase):
 class AccountCreate(BaseModel):
     email: str
     password: str
-    role: Literal['anggota', 'admin'] = 'anggota'
+    role: Literal['anggota', 'admin', 'staff'] = 'anggota'
     activated: Optional[bool] = False
 
 class AccountUpdate(BaseModel):
     email: Optional[str] = None
-    role: Optional[Literal['anggota', 'admin']] = None
+    password: Optional[str] = None
+    role: Optional[Literal['anggota', 'admin', 'staff']] = None
     activated: Optional[bool] = None

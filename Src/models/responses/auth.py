@@ -8,10 +8,10 @@ class Login(BaseModel):
 class GetMe(BaseModel):
     account_id: int
     email: EmailStr
-    role: Literal["anggota", "admin"]
+    role: Literal["anggota", "admin", "staff"]
     
 class UpdateMe(BaseModel):
     account_id: int
     email: EmailStr
-    role: Literal["anggota", "admin"]
+    role: Literal["anggota", "admin", "staff"]
     

@@ -28,6 +28,11 @@ def isAdmin(request: Request, session: SessionDep):
     if account.role != 'admin':
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this endpoint")
     
+def isAdminOrStaff(request: Request, session: SessionDep):
+    account = session.get(Account, request.scope['account_id'])
+    if not (account.role == 'admin' or account.role == 'staff'):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this endpoint")
+    
 def get_current_account(request: Request, session: SessionDep):
     account = session.get(Account, request.scope['account_id'])
     if not account:
